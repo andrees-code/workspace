@@ -39,19 +39,23 @@ import { useRouter } from 'vue-router'
 import { getAuth, signOut } from 'firebase/auth'
 import { getFirestore, doc, getDoc } from 'firebase/firestore'
 
+// Mis estados locales
 const myTasks = ref([])
 const loading = ref(true)
 const router = useRouter()
 const auth = getAuth()
 const db = getFirestore()
 
+// Función para ir a buscar mis datos a mi "cajón" personal de Firestore
 const fetchMyWorkspace = async () => {
   if (!auth.currentUser) return
 
   try {
+    // Apunto directamente a mi documento usando mi UID único
     const userRef = doc(db, 'users', auth.currentUser.uid)
     const userSnap = await getDoc(userRef)
 
+    // Si el documento existe y tiene tareas, las cargo en mi variable reactiva
     if (userSnap.exists() && userSnap.data().tasks) {
       myTasks.value = userSnap.data().tasks
     } else {
@@ -64,18 +68,18 @@ const fetchMyWorkspace = async () => {
   }
 }
 
+// Para cerrar la sesión y mandarme de vuelta al login
 const handleLogout = async () => {
   await signOut(auth)
   router.push('/login')
 }
 
 onMounted(() => {
-  // Pequeña espera para asegurar que auth.currentUser está listo si venimos de recarga
-  // En una app real, usaríamos onAuthStateChanged, pero para simplificar dentro de la vista:
+  // Truco: a veces Firebase tarda un pelo en reconocer al usuario al refrescar.
+  // Si no está listo, espero medio segundo antes de pedir las tareas o echar al usuario.
   if (auth.currentUser) {
     fetchMyWorkspace()
   } else {
-    // Si firebase aún está inicializando, podemos esperar un poco o redirigir
     setTimeout(() => {
       if (auth.currentUser) fetchMyWorkspace()
       else router.push('/login')
@@ -83,7 +87,9 @@ onMounted(() => {
   }
 })
 </script>
+
 <style lang="sass">
+/* Estilos Sass: aquí le doy el look de "lista profesional" */
 .p-6
   padding: 1.5rem
   max-width: 900px
@@ -97,36 +103,12 @@ header
   margin-bottom: 2rem
   border-bottom: 1px solid #e5e7eb
   padding-bottom: 1.5rem
-
   h1
     font-size: 1.75rem
     color: #1d4ed8
     font-weight: 800
 
-  .flex
-    display: flex
-    align-items: center
-    gap: 1.5rem
-
-    a
-      text-decoration: none
-      color: #4b5563
-      font-weight: 500
-      transition: color 0.2s
-      &:hover
-        color: #000
-
-    button
-      background: none
-      border: none
-      color: #ef4444
-      font-weight: 600
-      cursor: pointer
-      padding: 0
-      &:hover
-        text-decoration: underline
-
-// Estado vacío (Empty State)
+// El "Empty State" con bordes punteados para que sepa que ahí falta algo
 .text-center
   text-align: center
   padding: 4rem 2rem
@@ -134,33 +116,11 @@ header
   border-radius: 12px
   border: 2px dashed #e5e7eb
 
-  p
-    color: #6b7280
-    font-size: 1.1rem
-    margin-bottom: 1.5rem
-
-  a
-    display: inline-block
-    background-color: #2563eb
-    color: white
-    padding: 0.75rem 1.5rem
-    border-radius: 8px
-    text-decoration: none
-    font-weight: 600
-    transition: background 0.2s
-    &:hover
-      background-color: #1d4ed8
-
-// Lista de tareas
-.space-y-4
-  display: flex
-  flex-direction: column
-  gap: 1rem
-
+// Mis tarjetas de tareas con un borde lateral azul para que destaquen
 .bg-white
   background-color: #ffffff
   border: 1px solid #e5e7eb
-  border-left: 4px solid #3b82f6 // El borde azul acentuado
+  border-left: 4px solid #3b82f6
   border-radius: 8px
   padding: 1.25rem
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1)
@@ -168,37 +128,24 @@ header
   justify-content: space-between
   align-items: center
   transition: transform 0.1s ease
-
   &:hover
-    transform: scale(1.01)
+    transform: scale(1.01) // Pequeño efecto al pasar el ratón
 
   div
     h3
       font-size: 0.9rem
       color: #3b82f6
       text-transform: uppercase
-      letter-spacing: 0.05em
       margin: 0 0 0.25rem 0
-
     p
       font-size: 1.1rem
       color: #1f2937
       font-weight: 500
-      margin: 0
 
-  .text-sm
-    font-size: 0.8rem
-    background-color: #eff6ff
-    color: #1e40af
-    padding: 0.4rem 0.8rem
-    border-radius: 999px
-    font-weight: 600
-    white-space: nowrap
-
-// Mensajes de carga
-.text-gray-500
-  text-align: center
-  padding: 2rem
-  color: #6b7280
-  font-style: italic
+.text-sm
+  background-color: #eff6ff
+  color: #1e40af
+  padding: 0.4rem 0.8rem
+  border-radius: 999px
+  font-weight: 600
 </style>
