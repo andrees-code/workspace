@@ -82,8 +82,9 @@ import { useRouter } from 'vue-router'
 import { getAuth, signOut } from 'firebase/auth'
 import { getFirestore, doc, arrayUnion, setDoc, collection, onSnapshot } from 'firebase/firestore'
 
+// --- Mis variables de estado ---
 const todos = ref([])
-const assignmentsMap = ref({}) // Mapa de { id_tarea: uid_usuario }
+const assignmentsMap = ref({}) // Aquí guardo quién tiene qué: { taskId: userId }
 const loading = ref(true)
 const error = ref(null)
 const filterStatus = ref('all')
@@ -93,7 +94,7 @@ const router = useRouter()
 const auth = getAuth()
 const db = getFirestore()
 
-// 1. Obtener tareas de la API
+// Traigo las tareas de la API externa (DummyJSON)
 const fetchTodos = async () => {
   try {
     const res = await axios.get('https://dummyjson.com/todos?limit=50')
@@ -105,17 +106,17 @@ const fetchTodos = async () => {
   }
 }
 
-// 2. Escuchar cambios en Firebase para saber qué tareas están ocupadas
+// Me conecto a Firebase en tiempo real para ver quién ha cogido cada tarea
 const subscribeToGlobalAssignments = () => {
   const q = collection(db, 'users')
   onSnapshot(q, (snapshot) => {
     const mapping = {}
     snapshot.docs.forEach((doc) => {
-      const userId = doc.id // El ID del documento es el UID de Firebase
+      const userId = doc.id // El UID de cada usuario
       const data = doc.data()
       if (data.tasks && Array.isArray(data.tasks)) {
         data.tasks.forEach((t) => {
-          mapping[t.id] = userId // Guardamos quién es el dueño de la tarea
+          mapping[t.id] = userId // Mapeo ID_TAREA -> UID_DUEÑO
         })
       }
     })
@@ -123,6 +124,7 @@ const subscribeToGlobalAssignments = () => {
   })
 }
 
+// Filtro las tareas que veo en pantalla según el select
 const filteredTasks = computed(() => {
   if (filterStatus.value === 'all') return todos.value
   if (filterStatus.value === 'completed') return todos.value.filter((t) => t.completed)
@@ -133,6 +135,7 @@ const filteredTasks = computed(() => {
   return todos.value
 })
 
+// Función para "secuestrar" la tarea y guardarla en mi perfil de Firestore
 const addToMyWorkspace = async (task) => {
   if (!auth.currentUser) return
 
@@ -147,14 +150,14 @@ const addToMyWorkspace = async (task) => {
       assignedAt: new Date().toISOString(),
     }
 
-    // Guardamos en Firebase (REQUISITO EXAMEN)
+    // Guardo la tarea en el array 'tasks' de mi documento de usuario
     await setDoc(
       userRef,
       {
         email: auth.currentUser.email,
         tasks: arrayUnion(taskData),
       },
-      { merge: true },
+      { merge: true }, // Importante el merge para no borrar lo que ya tuviera el usuario
     )
   } catch (e) {
     console.error(e)
@@ -164,11 +167,13 @@ const addToMyWorkspace = async (task) => {
   }
 }
 
+// Función para salir de la app
 const handleLogout = async () => {
   await signOut(auth)
   router.push('/login')
 }
 
+// Al cargar el componente, disparo las peticiones
 onMounted(() => {
   fetchTodos()
   subscribeToGlobalAssignments()
@@ -176,7 +181,7 @@ onMounted(() => {
 </script>
 
 <style lang="sass">
-// Estilo Sass Indentado
+/* Estilos Sass indentado: limpio, sin llaves y fácil de leer */
 .p-6
   padding: 1.5rem
   max-width: 900px
@@ -252,6 +257,10 @@ header
     font-weight: 600
     border: none
     width: 100%
+    transition: background 0.2s
+    &:hover
+      background-color: #1d4ed8
     &:disabled
       background-color: #9ca3af
+      cursor: not-allowed
 </style>
